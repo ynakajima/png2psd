@@ -1,0 +1,15 @@
+{
+  "strict": true,
+  "indent" : 2,
+  "camelcase": true,
+  "maxlen": 80,
+  "unused": true,
+  "eqeqeq": true,
+  "undef": true,
+  "browser": true,
+  "dojo": true,
+  "debug": true,
+  "devel": true,
+  "node": true,
+  "predef": ["describe", "it"]
+} 
