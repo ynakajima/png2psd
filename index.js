@@ -87,7 +87,7 @@ function convertPNG2PSD (width, height, pngBuffer, callback) {
    * Image Data Block
    * - The complete merged image data
    */
-  var imageDataHeder = new jDataView(new Buffer(2));
+  var imageDataHeader = new jDataView(new Buffer(2));
   var imageDataSize = (numChunnel * width * height); 
   var imageData = new jDataView(new Buffer(imageDataSize));
 
@@ -101,7 +101,7 @@ function convertPNG2PSD (width, height, pngBuffer, callback) {
   }
 
   // write header
-  imageDataHeder.writeUint16(0); // Raw image data
+  imageDataHeader.writeUint16(0); // Raw image data
   
   // write red plane
   rgb.r.forEach(function(color) {
@@ -127,7 +127,7 @@ function convertPNG2PSD (width, height, pngBuffer, callback) {
     colorModeData.buffer,
     imageResources.buffer,
     layerMaskInfo.buffer,
-    imageDataHeder.buffer,
+    imageDataHeader.buffer,
     imageData.buffer
   ]);
 
