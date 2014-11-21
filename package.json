@@ -1,6 +1,6 @@
 {
   "name": "png2psd",
-  "version": "0.5.2",
+  "version": "0.6.0",
   "description": "convert PNG file to PSD file.",
   "main": "index.js",
   "scripts": {
