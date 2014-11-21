@@ -1,6 +1,6 @@
 {
   "name": "png2psd",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "description": "convert PNG file to PSD file.",
   "main": "index.js",
   "scripts": {
@@ -29,6 +29,7 @@
     "fast-image-size": "^0.1.2"
   },
   "devDependencies": {
+    "async": "^0.9.0",
     "chai": "^1.10.0",
     "mocha": "^2.0.1"
   }
