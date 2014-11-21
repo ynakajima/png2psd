@@ -88,42 +88,31 @@ function convertPNG2PSD (width, height, pngBuffer, callback) {
    * - The complete merged image data
    */
   var imageDataHeader = new jDataView(new Buffer(2));
-  var imageDataSize = (numChunnel * width * height); 
-  var imageData = new jDataView(new Buffer(imageDataSize));
-
-  // read png data
-  var rgb = {r: [], g: [], b: [], a: []};
-  for (var i = 0, l = pngBuffer.length; i < l; i += 4) {
-    rgb.r.push(pngBuffer.readUInt8(i));
-    rgb.g.push(pngBuffer.readUInt8(i + 1));
-    rgb.b.push(pngBuffer.readUInt8(i + 2));
-    rgb.a.push(pngBuffer.readUInt8(i + 3));
-  }
+  var imageDataSize = width * height; 
+  var imageData = {
+    r: new jDataView(new Buffer(imageDataSize)),
+    g: new jDataView(new Buffer(imageDataSize)),
+    b: new jDataView(new Buffer(imageDataSize))
+  };
 
   // write header
   imageDataHeader.writeUint16(0); // Raw image data
-  
-  // write red plane
-  rgb.r.forEach(function(color, index) {
-    var alpha = rgb.a[index];
-    var alphaBlended = alphaBlendWithWhite(color, alpha); 
-    imageData.writeUint8(alphaBlended);
-  });
 
-  // write green plane
-  rgb.g.forEach(function(color, index) {
-    var alpha = rgb.a[index];
-    var alphaBlended = alphaBlendWithWhite(color, alpha); 
-    imageData.writeUint8(alphaBlended);
-  });
+  // read png data
+  for (var i = 0, l = pngBuffer.length; i < l; i += 4) {
+    // get alpha value
+    var alpha = pngBuffer.readUInt8(i + 3);
 
-  // write blue plane
-  rgb.b.forEach(function(color, index) {
-    var alpha = rgb.a[index];
-    var alphaBlended = alphaBlendWithWhite(color, alpha); 
-    imageData.writeUint8(alphaBlended);
-  });
-
+    // get RGB
+    var r = pngBuffer.readUInt8(i);
+    var g = pngBuffer.readUInt8(i + 1);
+    var b = pngBuffer.readUInt8(i + 2);
+    
+    // write RGB (alpha blend with white background)
+    imageData.r.writeUint8(alphaBlendWithWhite(r, alpha));
+    imageData.g.writeUint8(alphaBlendWithWhite(g, alpha));
+    imageData.b.writeUint8(alphaBlendWithWhite(b, alpha));
+  }
 
   /**
    * create psd buffer
@@ -134,7 +123,9 @@ function convertPNG2PSD (width, height, pngBuffer, callback) {
     imageResources.buffer,
     layerMaskInfo.buffer,
     imageDataHeader.buffer,
-    imageData.buffer
+    imageData.r.buffer,
+    imageData.g.buffer,
+    imageData.b.buffer
   ]);
 
   callback(psd);
@@ -147,10 +138,13 @@ function convertPNG2PSD (width, height, pngBuffer, callback) {
  * @return {number} alpha blended color (0-255)
  */
 function alphaBlendWithWhite(srcColor, srcAlpha) {
-  if (srcAlpha === 255) return srcColor;
-  if (srcAlpha === 0) return 255;
+  var MAX = 255,
+      MIN = 0,
+      ALPHA_MAX = 1;
+  if (srcAlpha === MAX) return srcColor;
+  if (srcAlpha === MIN) return MAX;
 
-  var alpha = srcAlpha / 255;
-  return Math.round((srcColor * alpha) + (255 * (1 - alpha)));
+  var alpha = srcAlpha / MAX;
+  return Math.round((srcColor * alpha) + (MAX * (ALPHA_MAX - alpha)));
 }
 
