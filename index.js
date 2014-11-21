@@ -104,18 +104,24 @@ function convertPNG2PSD (width, height, pngBuffer, callback) {
   imageDataHeader.writeUint16(0); // Raw image data
   
   // write red plane
-  rgb.r.forEach(function(color) {
-    imageData.writeUint8(color);
+  rgb.r.forEach(function(color, index) {
+    var alpha = rgb.a[index];
+    var alphaBlended = alphaBlendWithWhite(color, alpha); 
+    imageData.writeUint8(alphaBlended);
   });
 
   // write green plane
-  rgb.g.forEach(function(color) {
-    imageData.writeUint8(color);
+  rgb.g.forEach(function(color, index) {
+    var alpha = rgb.a[index];
+    var alphaBlended = alphaBlendWithWhite(color, alpha); 
+    imageData.writeUint8(alphaBlended);
   });
 
   // write blue plane
-  rgb.b.forEach(function(color) {
-    imageData.writeUint8(color);
+  rgb.b.forEach(function(color, index) {
+    var alpha = rgb.a[index];
+    var alphaBlended = alphaBlendWithWhite(color, alpha); 
+    imageData.writeUint8(alphaBlended);
   });
 
 
@@ -132,5 +138,19 @@ function convertPNG2PSD (width, height, pngBuffer, callback) {
   ]);
 
   callback(psd);
+}
+
+/**
+ * Alpha blend with white background
+ * @param srcColor {number} source color (0-255)
+ * @param srcAlpha {number} source alpha (0-255)
+ * @return {number} alpha blended color (0-255)
+ */
+function alphaBlendWithWhite(srcColor, srcAlpha) {
+  if (srcAlpha === 255) return srcColor;
+  if (srcAlpha === 0) return 255;
+
+  var alpha = srcAlpha / 255;
+  return Math.round((srcColor * alpha) + (255 * (1 - alpha)));
 }
 
