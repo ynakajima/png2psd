@@ -1,7 +1,8 @@
 'use strict';
 var jDataView = require('jdataview'),
-    fastImageSize = require('fast-image-size'),
-    PNG = require('png-js');
+    PNGDecoder = require('png-stream').Decoder,
+    concat = require('concat-frames'),
+    fs = require('fs');
 
 /**
  * png2psd
@@ -10,29 +11,31 @@ var jDataView = require('jdataview'),
  */
 module.exports = function(pngFilePath, callback) {
   // read png file
-  fastImageSize(pngFilePath, function(image) {
-    PNG.decode(pngFilePath, function(pngBuffer) {
-      
-      // conver psd
-      convertPNG2PSD(image.width, image.height, pngBuffer,
+  fs.createReadStream(pngFilePath)
+    .pipe(new PNGDecoder())
+    .pipe(concat(function(frames) {
+      var image = frames[0];
+      convertPNG2PSD(image.width, image.height, image.colorSpace, image.pixels,
         function(psdFileBuffer) {
           callback(psdFileBuffer);
         });
-    });
-  }); 
+    }));
 };
 
 /**
  * convertPNG2PSD
  * @param width {number} width of png
  * @param height {number} height of png
+ * @param colorspace {string} rgb or rgba
  * @param pngBuffer {Buffer} buffer of pngfile
  * @param callback {function} function(psdFileBuffer)
  */
 
-function convertPNG2PSD (width, height, pngBuffer, callback) {
+function convertPNG2PSD (width, height, colorspace, pngBuffer, callback) {
 
   // init
+  var isRGBA = (colorspace.toLowerCase() === 'rgba');
+  var numPNGChannel = isRGBA ? 4 : 3;
   var numChannel = 3;
   var colormode = 3; // RBG
 
@@ -41,17 +44,22 @@ function convertPNG2PSD (width, height, pngBuffer, callback) {
   var pngData = {
     r: new jDataView(new Buffer(imageDataSize)),
     g: new jDataView(new Buffer(imageDataSize)),
-    b: new jDataView(new Buffer(imageDataSize)),
-    a: new jDataView(new Buffer(imageDataSize))
+    b: new jDataView(new Buffer(imageDataSize))
   };
 
+  if (isRGBA) {
+    pngData.a = new jDataView(new Buffer(imageDataSize));
+  }
+
   // read png data
-  for (var i = 0, l = pngBuffer.length; i < l; i += 4) {
+  for (var i = 0, l = pngBuffer.length; i < l; i += numPNGChannel) {
     // read and write RGBA
     pngData.r.writeUint8(pngBuffer.readUInt8(i));
     pngData.g.writeUint8(pngBuffer.readUInt8(i + 1));
     pngData.b.writeUint8(pngBuffer.readUInt8(i + 2));
-    pngData.a.writeUint8(pngBuffer.readUInt8(i + 3));
+    if (isRGBA) {
+      pngData.a.writeUint8(pngBuffer.readUInt8(i + 3));
+    }
   }
 
   /**
@@ -100,9 +108,13 @@ function convertPNG2PSD (width, height, pngBuffer, callback) {
   var layerChannnels = [
     {id: 0, data: pngData.r.buffer}, // red
     {id: 1, data: pngData.g.buffer}, // green
-    {id: 2, data: pngData.b.buffer}, // blue
-    {id: -1, data: pngData.a.buffer} // alpha
+    {id: 2, data: pngData.b.buffer}  // blue
+
   ];
+
+  if (isRGBA) {
+    layerChannnels.push({id: -1, data: pngData.a.buffer}); // alpha
+  }
 
   // channnel image data
   var channelImageData = [];
@@ -234,7 +246,7 @@ function convertPNG2PSD (width, height, pngBuffer, callback) {
   // read png data
   for (i = 0, l = pngData.r.buffer.length; i < l; i++) {
     // get alpha value
-    var alpha = pngData.a.getUint8(i);
+    var alpha = isRGBA ? pngData.a.getUint8(i) : 255;
 
     // get RGB
     var r = pngData.r.getUint8(i);
