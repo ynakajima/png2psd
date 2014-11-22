@@ -1,10 +1,10 @@
 {
   "name": "png2psd",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "description": "convert PNG file to PSD file.",
   "main": "index.js",
   "scripts": {
-    "test": "./node_modules/.bin/mocha --recursive test"
+    "test": "mocha --recursive test"
   },
   "bin": {
     "png2psd": "./bin/png2psd.js"
@@ -31,5 +31,8 @@
   "devDependencies": {
     "chai": "^1.10.0",
     "mocha": "^2.0.1"
+  },
+  "engines": {
+    "node": "0.10.x"
   }
 }
