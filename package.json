@@ -4,7 +4,7 @@
   "description": "convert PNG file to PSD file.",
   "main": "index.js",
   "scripts": {
-    "test": "./node_modules/.bin/mocha test"
+    "test": "./node_modules/.bin/mocha --recursive test"
   },
   "bin": {
     "png2psd": "./bin/png2psd.js"

@@ -2,6 +2,7 @@
 var jDataView = require('jdataview'),
     PNGDecoder = require('png-stream').Decoder,
     concat = require('concat-frames'),
+    encodeRLE = require('./lib/packbits').encode,
     fs = require('fs'),
     RGBA = {
       R:   0, G:   1, B:   2, A:   3, 
@@ -115,7 +116,6 @@ function convertPNG2PSD (width, height, colorspace, pngBuffer, callback) {
     {id: 2, data: pngData.b.buffer}  // blue
 
   ];
-
   if (isRGBA) {
     layerChannnels.push({id: -1, data: pngData.a.buffer}); // alpha
   }
@@ -124,12 +124,27 @@ function convertPNG2PSD (width, height, colorspace, pngBuffer, callback) {
   var channelImageData = [];
   layerChannnels.forEach(function(channel) {
     var compression = new Buffer(2);
-    compression.writeUInt16BE(0, 0); // Raw Data
+    compression.writeUInt16BE(1, 0); // RLE
+    
+    // RLE compress
+    var compressedLines = [];
+    var byteCounts = new jDataView(new Buffer(height * 2));
+    byteCounts.buffer.fill(0);
 
+    for (i = 0; i < height; i++) {
+      // read line data 
+      var start = i * width; 
+      var end = start + width - 1;
+      var compressedLine = encodeRLE(channel.data.slice(start, end));
+      compressedLines.push(compressedLine);
+      byteCounts.writeUint16(compressedLine.length);
+    }
+    
     // concat channel data 
     channelImageData.push(Buffer.concat([
       compression, // compression
-      channel.data // image data
+      byteCounts.buffer, // byte counts
+      Buffer.concat(compressedLines) // RLE compressed data
     ]));
   });
   channelImageData = Buffer.concat(channelImageData);
@@ -273,9 +288,9 @@ function convertPNG2PSD (width, height, colorspace, pngBuffer, callback) {
   }
 
   // write header
-  imageDataHeader.writeUint16(0); // Raw image data
-  
-  // read png data
+  imageDataHeader.writeUint16(1); // RLE
+
+  // read png data and compress RLE
   for (i = 0, l = pngData.r.buffer.length; i < l; i++) {
     // get alpha value
     var alpha = isRGBA ? pngData.a.getUint8(i) : 255;
@@ -293,11 +308,63 @@ function convertPNG2PSD (width, height, colorspace, pngBuffer, callback) {
       imageData[RGBA.A].writeUint8(alpha);
     }
   }
+
+  /*
+  // RLE compress
+    var compressedLines = [];
+    var byteCounts = new jDataView(new Buffer(height * 2));
+    byteCounts.buffer.fill(0);
+
+    for (i = 0; i < height; i++) {
+      // read line data 
+      var start = i * width; 
+      var end = start + width - 1;
+      var compressedLine = encodeRLE(channel.data.slice(start, end));
+      compressedLines.push(compressedLine);
+      byteCounts.writeUint16(compressedLine.length);
+    }
+    
+    // concat channel data 
+    channelImageData.push(Buffer.concat([
+      compression, // compression
+      byteCounts.buffer, // byte counts
+      Buffer.concat(compressedLines) // RLE compressed data
+    ]));
+  */
   
+  // RLE compress
+  var byteCounts = [
+    new Buffer(height * 2),
+    new Buffer(height * 2),
+    new Buffer(height * 2)
+  ];
+  var compressedImageData = [[], [], []];
+  if (isRGBA) {
+    byteCounts.push(new Buffer(height * 2));
+    compressedImageData.push([]);
+  }
+  for (i = 0; i < height; i++) {
+    // read inedata by channel
+    var start = i * width;
+    var end = start + width - 1;
+    
+    for (var j = 0; j < numChannel; j++) {
+      var channel = imageData[j];
+      var compressedLine = encodeRLE(channel.buffer.slice(start, end));
+      compressedImageData[j].push(compressedLine);
+      byteCounts[j].writeUInt16BE(compressedLine.length, i * 2);
+    }
+  }
+
+  // caoncat byte counts
+  byteCounts = Buffer.concat(byteCounts);
+
   // concat image data
-  imageData = Buffer.concat(imageData.map(function(data) {
-    return data.buffer; 
-  }));
+  compressedImageData = Buffer.concat(
+    compressedImageData.map(function(channel) {
+      return Buffer.concat(channel);
+    })
+  );
 
   /**
    * create psd buffer
@@ -308,7 +375,8 @@ function convertPNG2PSD (width, height, colorspace, pngBuffer, callback) {
     imageResources.buffer,
     layerAndMaskInfo,
     imageDataHeader.buffer,
-    imageData
+    byteCounts,
+    compressedImageData
   ]);
 
   callback(psd);
