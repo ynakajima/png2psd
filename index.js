@@ -212,20 +212,45 @@ function convertPNG2PSD (width, height, colorspace, pngBuffer, callback) {
   ]);
 
   // Global layer mask info
-  var globalLayerMaskInfo = new jDataView(new Buffer(4));
-  globalLayerMaskInfo.writeUint32(0);
+  var globalLayerMaskInfoSize = 4 + 2 + 8 + 2 + 1 + 1;
+  var globalLayerMaskInfo = new jDataView(new Buffer(globalLayerMaskInfoSize));
+  globalLayerMaskInfo.writeUint32(globalLayerMaskInfoSize - 4); // length
+  globalLayerMaskInfo.writeUint16(0); // Overlay color space
+  globalLayerMaskInfo.writeUint32(0); // 4 * 2 byte color components
+  globalLayerMaskInfo.writeUint32(0); // 4 * 2 byte color components
+  globalLayerMaskInfo.writeUint16(0); // Opacity
+  globalLayerMaskInfo.writeUint8(0); // kind
+  globalLayerMaskInfo.writeUint8(0); // Filler: zeros
+
+  // Aadditional layer information (Unicode layer name)
+  var layerName = 'png2psd';
+  var additionalLayerInfoSize = (4 * 3) + (4 + (2* layerName.length));
+  var additionalLayerInfo = new jDataView(new Buffer(additionalLayerInfoSize));
+
+  additionalLayerInfo.writeString('8BIM'); // signature
+  additionalLayerInfo.writeString('luni'); // Key: Unicode layer name
+  additionalLayerInfo.writeUint32(additionalLayerInfoSize - (4 * 3));
+  
+  additionalLayerInfo.writeUint32(layerName.length); // Unicode length
+  for (i = 0, l = layerName.length; i < l; i++) {
+    var codepoint = layerName.charCodeAt(i);
+    additionalLayerInfo.writeUint16(codepoint); // write Unicode value
+  }
 
   // Length of the layer and mask information section.
   var layerAndMaskInfoHeader = new jDataView(new Buffer(4));
   layerAndMaskInfoHeader.writeUint32(
-    layerInfo.length + globalLayerMaskInfo.buffer.length
+    layerInfo.length +
+    globalLayerMaskInfo.buffer.length +
+    additionalLayerInfo.buffer.length
   );
 
   // layer and mask info
   var layerAndMaskInfo = Buffer.concat([
     layerAndMaskInfoHeader.buffer,
     layerInfo,
-    globalLayerMaskInfo.buffer
+    globalLayerMaskInfo.buffer,
+    additionalLayerInfo.buffer
   ]);
 
 
