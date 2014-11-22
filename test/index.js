@@ -10,24 +10,24 @@ var png2psd = require('../'),
 describe('png2psd', function() {
 
   it('should convert RGB PNG file to RGB PSD file.', function(done) {
-    this.timeout(8000);
+    this.timeout(15000);
     test('rgb', done);
   });
 
   it('should convert RGBA PNG file to RGBA PSD file.', function(done) {
-    this.timeout(8000);
+    this.timeout(15000);
     test('rgba', done);
   });
 
   it('should convert Grayscale PNG file ' + 
      'to Grayscale PSD file.', function(done) {
-    this.timeout(8000);
+    this.timeout(15000);
     test('gray', done);
   });
 
   it('should convert Grayscale (with Alpha) PNG file ' +
      'to Grayscale (with Alpha) PSD file.', function(done) {
-    this.timeout(8000);
+    this.timeout(15000);
     test('graya', done);
   });
 
