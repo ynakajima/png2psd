@@ -4,10 +4,9 @@ var jDataView = require('jdataview'),
     concat = require('concat-frames'),
     encodeRLE = require('./lib/packbits').encode,
     fs = require('fs'),
-    RGBA = {
-      R:   0, G:   1, B:   2, A:   3, 
-      0: 'R', 1: 'G', 2: 'B', 3: 'A'
-    };
+    COLOR_MODE = {gray: 1, graya: 1, rgb: 3, rgba: 3},
+    NUM_CHANNEL = {gray: 1, graya: 2, rgb: 3, rgba: 4},
+    HAS_ALPHA = {gray: false, graya: true, rgb: false, rgba: true};
 
 /**
  * png2psd
@@ -31,39 +30,33 @@ module.exports = function(pngFilePath, callback) {
  * convertPNG2PSD
  * @param width {number} width of png
  * @param height {number} height of png
- * @param colorspace {string} rgb or rgba
+ * @param colorspace {string} rgb or rgba or gray or graya
  * @param pngBuffer {Buffer} buffer of pngfile
  * @param callback {function} function(psdFileBuffer)
  */
 
 function convertPNG2PSD (width, height, colorspace, pngBuffer, callback) {
+  // check colorspace
+  if (typeof COLOR_MODE[colorspace] === 'undefined') {
+    throw new Error('colorspace : ' + colorspace + ' is not supported.');
+  }
 
   // init
-  var isRGBA = (colorspace.toLowerCase() === 'rgba');
-  var numPNGChannel = isRGBA ? 4 : 3;
-  var numChannel = numPNGChannel;
-  var colormode = 3; // RBG
+  var numChannel = NUM_CHANNEL[colorspace];
+  var colormode = COLOR_MODE[colorspace];
+  var hasAlpha = HAS_ALPHA[colorspace];
 
   // read png image
   var imageDataSize = width * height; 
-  var pngData = {
-    r: new jDataView(new Buffer(imageDataSize)),
-    g: new jDataView(new Buffer(imageDataSize)),
-    b: new jDataView(new Buffer(imageDataSize))
-  };
-
-  if (isRGBA) {
-    pngData.a = new jDataView(new Buffer(imageDataSize));
+  var pngData = [];
+  for (var i = 0, l = numChannel; i < l; i++) {
+    pngData.push(new jDataView(new Buffer(imageDataSize)));
   }
 
   // read png data
-  for (var i = 0, l = pngBuffer.length; i < l; i += numPNGChannel) {
-    // read and write RGBA
-    pngData.r.writeUint8(pngBuffer.readUInt8(i));
-    pngData.g.writeUint8(pngBuffer.readUInt8(i + 1));
-    pngData.b.writeUint8(pngBuffer.readUInt8(i + 2));
-    if (isRGBA) {
-      pngData.a.writeUint8(pngBuffer.readUInt8(i + 3));
+  for (i = 0, l = pngBuffer.length; i < l; i += numChannel) {
+    for (var index = 0; index < numChannel; index++) { 
+      pngData[index].writeUint8(pngBuffer.readUInt8(i + index));
     }
   }
 
@@ -110,14 +103,15 @@ function convertPNG2PSD (width, height, colorspace, pngBuffer, callback) {
    */
 
   // Layer channels
-  var layerChannnels = [
-    {id: 0, data: pngData.r.buffer}, // red
-    {id: 1, data: pngData.g.buffer}, // green
-    {id: 2, data: pngData.b.buffer}  // blue
-
-  ];
-  if (isRGBA) {
-    layerChannnels.push({id: -1, data: pngData.a.buffer}); // alpha
+  var layerChannnels = [];
+  for (i = 0; i < numChannel; i++) {
+    layerChannnels.push({
+      id: i,
+      data: pngData[i].buffer
+    });
+  }
+  if (hasAlpha) {
+    layerChannnels[numChannel - 1].id = -1; 
   }
 
   // channnel image data
@@ -278,12 +272,8 @@ function convertPNG2PSD (width, height, colorspace, pngBuffer, callback) {
    * - The complete merged image data
    */
   var imageDataHeader = new jDataView(new Buffer(2));
-  var imageData = [
-    new jDataView(new Buffer(imageDataSize)),
-    new jDataView(new Buffer(imageDataSize)),
-    new jDataView(new Buffer(imageDataSize))
-  ];
-  if (isRGBA) {
+  var imageData = [];
+  for (i = 0; i < numChannel; i++) {
     imageData.push(new jDataView(new Buffer(imageDataSize)));
   }
 
@@ -291,68 +281,39 @@ function convertPNG2PSD (width, height, colorspace, pngBuffer, callback) {
   imageDataHeader.writeUint16(1); // RLE
 
   // read png data and compress RLE
-  for (i = 0, l = pngData.r.buffer.length; i < l; i++) {
+  for (i = 0; i < imageDataSize; i++) {
     // get alpha value
-    var alpha = isRGBA ? pngData.a.getUint8(i) : 255;
+    var alpha = hasAlpha ? pngData[numChannel - 1].getUint8(i) : 255;
 
-    // get RGB
-    var r = pngData.r.getUint8(i);
-    var g = pngData.g.getUint8(i);
-    var b = pngData.b.getUint8(i);
-    
-    // write RGB (alpha blend with white background)
-    imageData[RGBA.R].writeUint8(alphaBlendWithWhite(r, alpha));
-    imageData[RGBA.G].writeUint8(alphaBlendWithWhite(g, alpha));
-    imageData[RGBA.B].writeUint8(alphaBlendWithWhite(b, alpha));
-    if (isRGBA) { 
-      imageData[RGBA.A].writeUint8(alpha);
+    // read png pixel data and write image data
+    for (var j = 0; j < numChannel; j++) {
+      var color = pngData[j].getUint8(i);
+      if (hasAlpha && j === numChannel - 1) {
+        imageData[j].writeUint8(alpha);
+      } else {
+        imageData[j].writeUint8(alphaBlendWithWhite(color, alpha));
+      }
     }
   }
 
-  /*
   // RLE compress
-    var compressedLines = [];
-    var byteCounts = new jDataView(new Buffer(height * 2));
-    byteCounts.buffer.fill(0);
-
-    for (i = 0; i < height; i++) {
-      // read line data 
-      var start = i * width; 
-      var end = start + width - 1;
-      var compressedLine = encodeRLE(channel.data.slice(start, end));
-      compressedLines.push(compressedLine);
-      byteCounts.writeUint16(compressedLine.length);
-    }
-    
-    // concat channel data 
-    channelImageData.push(Buffer.concat([
-      compression, // compression
-      byteCounts.buffer, // byte counts
-      Buffer.concat(compressedLines) // RLE compressed data
-    ]));
-  */
-  
-  // RLE compress
-  var byteCounts = [
-    new Buffer(height * 2),
-    new Buffer(height * 2),
-    new Buffer(height * 2)
-  ];
-  var compressedImageData = [[], [], []];
-  if (isRGBA) {
+  var byteCounts = [];
+  var compressedImageData = [];
+  for (i = 0; i < numChannel; i++) {
     byteCounts.push(new Buffer(height * 2));
     compressedImageData.push([]);
-  }
+  } 
+
   for (i = 0; i < height; i++) {
     // read inedata by channel
     var start = i * width;
     var end = start + width - 1;
     
-    for (var j = 0; j < numChannel; j++) {
-      var channel = imageData[j];
+    for (var k = 0; k < numChannel; k++) {
+      var channel = imageData[k];
       var compressedLine = encodeRLE(channel.buffer.slice(start, end));
-      compressedImageData[j].push(compressedLine);
-      byteCounts[j].writeUInt16BE(compressedLine.length, i * 2);
+      compressedImageData[k].push(compressedLine);
+      byteCounts[k].writeUInt16BE(compressedLine.length, i * 2);
     }
   }
 
