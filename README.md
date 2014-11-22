@@ -3,7 +3,7 @@ png2psd
 
 convert PNG file to PSD file.
 
-[![Build Status](https://secure.travis-ci.org/ynakajima/png2psd.png?branch=master)](http://travis-ci.org/ynakajima/png2psd) [![npm version](https://badge.fury.io/js/png2psd.svg)](http://badge.fury.io/js/png2psd)
+[![Build Status](https://secure.travis-ci.org/ynakajima/png2psd.png?branch=master)](http://travis-ci.org/ynakajima/png2psd) [![npm version](https://badge.fury.io/js/png2psd.svg)](http://badge.fury.io/js/png2psd) ![node dependencies](https://david-dm.org/ynakajima/png2psd.png)
 
 ## cli
 
