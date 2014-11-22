@@ -2,7 +2,11 @@
 var jDataView = require('jdataview'),
     PNGDecoder = require('png-stream').Decoder,
     concat = require('concat-frames'),
-    fs = require('fs');
+    fs = require('fs'),
+    RGBA = {
+      R:   0, G:   1, B:   2, A:   3, 
+      0: 'R', 1: 'G', 2: 'B', 3: 'A'
+    };
 
 /**
  * png2psd
@@ -36,7 +40,7 @@ function convertPNG2PSD (width, height, colorspace, pngBuffer, callback) {
   // init
   var isRGBA = (colorspace.toLowerCase() === 'rgba');
   var numPNGChannel = isRGBA ? 4 : 3;
-  var numChannel = 3;
+  var numChannel = numPNGChannel;
   var colormode = 3; // RBG
 
   // read png image
@@ -212,20 +216,45 @@ function convertPNG2PSD (width, height, colorspace, pngBuffer, callback) {
   ]);
 
   // Global layer mask info
-  var globalLayerMaskInfo = new jDataView(new Buffer(4));
-  globalLayerMaskInfo.writeUint32(0);
+  var globalLayerMaskInfoSize = 4 + 2 + 8 + 2 + 1 + 1;
+  var globalLayerMaskInfo = new jDataView(new Buffer(globalLayerMaskInfoSize));
+  globalLayerMaskInfo.writeUint32(globalLayerMaskInfoSize - 4); // length
+  globalLayerMaskInfo.writeUint16(0); // Overlay color space
+  globalLayerMaskInfo.writeUint32(0); // 4 * 2 byte color components
+  globalLayerMaskInfo.writeUint32(0); // 4 * 2 byte color components
+  globalLayerMaskInfo.writeUint16(0); // Opacity
+  globalLayerMaskInfo.writeUint8(0); // kind
+  globalLayerMaskInfo.writeUint8(0); // Filler: zeros
+
+  // Aadditional layer information (Unicode layer name)
+  var layerName = 'png2psd';
+  var additionalLayerInfoSize = (4 * 3) + (4 + (2* layerName.length));
+  var additionalLayerInfo = new jDataView(new Buffer(additionalLayerInfoSize));
+
+  additionalLayerInfo.writeString('8BIM'); // signature
+  additionalLayerInfo.writeString('luni'); // Key: Unicode layer name
+  additionalLayerInfo.writeUint32(additionalLayerInfoSize - (4 * 3));
+  
+  additionalLayerInfo.writeUint32(layerName.length); // Unicode length
+  for (i = 0, l = layerName.length; i < l; i++) {
+    var codepoint = layerName.charCodeAt(i);
+    additionalLayerInfo.writeUint16(codepoint); // write Unicode value
+  }
 
   // Length of the layer and mask information section.
   var layerAndMaskInfoHeader = new jDataView(new Buffer(4));
   layerAndMaskInfoHeader.writeUint32(
-    layerInfo.length + globalLayerMaskInfo.buffer.length
+    layerInfo.length +
+    globalLayerMaskInfo.buffer.length +
+    additionalLayerInfo.buffer.length
   );
 
   // layer and mask info
   var layerAndMaskInfo = Buffer.concat([
     layerAndMaskInfoHeader.buffer,
     layerInfo,
-    globalLayerMaskInfo.buffer
+    globalLayerMaskInfo.buffer,
+    additionalLayerInfo.buffer
   ]);
 
 
@@ -234,11 +263,14 @@ function convertPNG2PSD (width, height, colorspace, pngBuffer, callback) {
    * - The complete merged image data
    */
   var imageDataHeader = new jDataView(new Buffer(2));
-  var imageData = {
-    r: new jDataView(new Buffer(imageDataSize)),
-    g: new jDataView(new Buffer(imageDataSize)),
-    b: new jDataView(new Buffer(imageDataSize))
-  };
+  var imageData = [
+    new jDataView(new Buffer(imageDataSize)),
+    new jDataView(new Buffer(imageDataSize)),
+    new jDataView(new Buffer(imageDataSize))
+  ];
+  if (isRGBA) {
+    imageData.push(new jDataView(new Buffer(imageDataSize)));
+  }
 
   // write header
   imageDataHeader.writeUint16(0); // Raw image data
@@ -254,10 +286,18 @@ function convertPNG2PSD (width, height, colorspace, pngBuffer, callback) {
     var b = pngData.b.getUint8(i);
     
     // write RGB (alpha blend with white background)
-    imageData.r.writeUint8(alphaBlendWithWhite(r, alpha));
-    imageData.g.writeUint8(alphaBlendWithWhite(g, alpha));
-    imageData.b.writeUint8(alphaBlendWithWhite(b, alpha));
+    imageData[RGBA.R].writeUint8(alphaBlendWithWhite(r, alpha));
+    imageData[RGBA.G].writeUint8(alphaBlendWithWhite(g, alpha));
+    imageData[RGBA.B].writeUint8(alphaBlendWithWhite(b, alpha));
+    if (isRGBA) { 
+      imageData[RGBA.A].writeUint8(alpha);
+    }
   }
+  
+  // concat image data
+  imageData = Buffer.concat(imageData.map(function(data) {
+    return data.buffer; 
+  }));
 
   /**
    * create psd buffer
@@ -268,9 +308,7 @@ function convertPNG2PSD (width, height, colorspace, pngBuffer, callback) {
     imageResources.buffer,
     layerAndMaskInfo,
     imageDataHeader.buffer,
-    imageData.r.buffer,
-    imageData.g.buffer,
-    imageData.b.buffer
+    imageData
   ]);
 
   callback(psd);
