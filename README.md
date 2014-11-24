@@ -3,7 +3,7 @@ png2psd
 
 convert PNG file to PSD file.
 
-[![Build Status](https://secure.travis-ci.org/ynakajima/png2psd.png?branch=master)](http://travis-ci.org/ynakajima/png2psd) [![npm version](https://badge.fury.io/js/png2psd.svg)](http://badge.fury.io/js/png2psd) ![node dependencies](https://david-dm.org/ynakajima/png2psd.png)
+[![Build Status](http://img.shields.io/travis/ynakajima/png2psd/master.svg?style=flat)](http://travis-ci.org/ynakajima/png2psd) [![Code Climate](http://img.shields.io/codeclimate/github/ynakajima/png2psd.svg?style=flat)](https://codeclimate.com/github/ynakajima/png2psd) [![npm version](http://img.shields.io/npm/v/png2psd.svg?style=flat)](https://www.npmjs.org/package/png2psd) [![npm downloads](http://img.shields.io/npm/dm/png2psd.svg?style=flat)](https://www.npmjs.org/package/png2psd) ![dependencies](http://img.shields.io/david/ynakajima/png2psd.svg?style=flat) [![license MIT](http://img.shields.io/badge/license-MIT-blue.svg?style=flat)](https://github.com/ynakajima/png2psd/blob/master/LICENSE)
 
 ## cli
 
