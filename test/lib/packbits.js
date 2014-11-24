@@ -2,7 +2,7 @@
 require('mocha');
 require('chai').should();
 
-var packbits = require('../../lib/packbits');
+var packbits = require('../../lib/util/packbits');
 var data = [
   80, 80, 80, // -2, 80
   81, 82, 83, 84, 85, // 4, 81, 82, 83, 84, 85
