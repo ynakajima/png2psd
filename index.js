@@ -3,6 +3,7 @@ var PNGDecoder = require('png-stream').Decoder,
     concat = require('concat-frames'),
     PSD = require('./lib/psd/psd'),
     ImageData = require('./lib/psd/image'),
+    Layer = require('./lib/psd/layer'),
     jDataView = require('jdataview'),
     fs = require('fs');
 
@@ -32,7 +33,14 @@ function convertPNG2PSD (png, callback) {
   // create psd data
   var psd = new PSD(png.width, png.height, png.colorSpace);
 
-  // create image data
+  // append layer
+  var image = new ImageData(png.width, png.height, 
+    png.colorSpace, new jDataView(png.pixels));
+  var layer = new Layer();
+  layer.drawImage(image);
+  psd.appendLayer(layer);
+
+  // create merged image data
   psd.imageData = new ImageData(png.width, png.height, 
     png.colorSpace, new jDataView(png.pixels));
 
@@ -49,7 +57,6 @@ function convertPNG2PSD (png, callback) {
         pixels.setUint8(index, blendedColor);
       }
     }
-
   }
 
   callback(psd.toBinary());
